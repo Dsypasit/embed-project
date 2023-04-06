@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Tag from "./_tag";
+import useWebSocket, { ReadyState } from "react-use-websocket";
 
 type tagType = {
   slaveName: string;
@@ -9,30 +10,36 @@ type tagType = {
 
 type tagDataType = {
   name: string;
-  voltage: number;
-  current: number;
-  power: number;
+  data: {
+    voltage: number;
+    current: number;
+    power: number;
+  };
 };
 
-function updateData(newTag: tagType, tag: tagDataType[]) {
-  let obj = tag.filter((o: any) => o.name == newTag.slaveName);
+async function updateTag(newTag: tagType, tag: tagDataType[]) {
+  let obj = tag.filter((o) => o.name == newTag.slaveName);
+  console.log(obj);
+  
   if (obj.length == 0) {
-    return;
+    return tag;
   }
   let newObj = obj[0];
 
   switch (newTag.valueType) {
     case "voltage":
-      newObj.voltage = newTag.value;
+      newObj.data.voltage = newTag.value;
     case "current":
-      newObj.current = newTag.value;
+      newObj.data.current = newTag.value;
     case "power":
-      newObj.power = newTag.value;
+      newObj.data.power = newTag.value;
   }
 
-  let newData: tagDataType[] = tag.filter((o: any) => o.name !== newTag.slaveName);
+  let newData: tagDataType[] = tag.filter(
+    (o: any) => o.name !== newTag.slaveName
+  );
   newData.push(newObj);
-
+  console.log(newData);
   return newData;
 }
 
@@ -41,7 +48,7 @@ export default function Home() {
     value: 35,
   });
 
-  const [tag, setTag] = useState([
+  const [tag, setTag] = useState<tagDataType[]>([
     {
       name: "Main",
       data: {
@@ -76,6 +83,33 @@ export default function Home() {
     },
   ]);
 
+  const { sendMessage, lastMessage, readyState } = useWebSocket(
+    "ws://localhost:8080"
+  );
+
+  useEffect(() => {
+    if (lastMessage !== null) {
+      let messageData = JSON.parse(lastMessage?.data);
+      if (messageData.type === "temp") {
+        setTemp({ value: messageData.data.value });
+      } else {
+        const fetch = async () => {
+          let newTag = await updateTag(messageData.data, tag);
+          await setTag(newTag);
+        };
+        fetch()
+      }
+      //   switch (messageData.type) {
+      //     case "temp":
+      //       setTemp({ value: messageData.data.value });
+      //     case "tag":
+      //       console.log(messageData);
+      //       let newTag = updateTag(messageData.data, tag);
+      //       setTag(newTag);
+      //   }
+    }
+  }, [lastMessage, setTag, setTemp]);
+
   return (
     <div className="bg-rose-400 h-full py-20">
       <div className="flex justify-center text-center">
@@ -91,15 +125,31 @@ export default function Home() {
               <h1 className="text-center">temporature</h1>
             </div>
             <h5 className="mb-2 text-center text-2xl font-bold tracking-tight text-gray-900">
-              {temp.value} c
+              {temp.value.toFixed(2)} c
             </h5>
           </div>
         </div>
       </div>
-      <Tag tag={tag[0].name} data={tag[0].data} />
-      <Tag tag={tag[1].name} data={tag[1].data} />
-      <Tag tag={tag[2].name} data={tag[2].data} />
-      <Tag tag={tag[3].name} data={tag[3].data} />
+      {tag.map((obj, i) => {
+        if (obj.name === "Main") {
+          return <Tag key={i} tag={obj.name} data={obj.data} />;
+        }
+      })}
+      {tag.map((obj, i) => {
+        if (obj.name === "Sub1") {
+          return <Tag key={i} tag={obj.name} data={obj.data} />;
+        }
+      })}
+      {tag.map((obj, i) => {
+        if (obj.name === "Sub2") {
+          return <Tag key={i} tag={obj.name} data={obj.data} />;
+        }
+      })}
+      {tag.map((obj, i) => {
+        if (obj.name === "Sub3") {
+          return <Tag key={i} tag={obj.name} data={obj.data} />;
+        }
+      })}
     </div>
   );
 }
